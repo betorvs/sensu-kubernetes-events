@@ -200,6 +200,7 @@ func TestCreateSensuEvent(t *testing.T) {
 	plugin.Interval = 60
 	plugin.Handlers = []string{"slack"}
 	plugin.PluginConfig.Name = "kubernetes-event=check"
+	plugin.AddClusterAnnotation = "k8s-great-cluster"
 
 	for _, tc := range testcases {
 		assert := assert.New(t)
@@ -225,6 +226,7 @@ func TestCreateSensuEvent(t *testing.T) {
 		assert.Equal(tc.evStatus, ev.Check.Status)
 		assert.Equal(tc.evEntityName, ev.Check.ProxyEntityName)
 		assert.Equal(tc.evCheckName, ev.Check.ObjectMeta.Name)
+		assert.Equal(plugin.AddClusterAnnotation, ev.Labels["io.kubernetes.cluster"])
 	}
 }
 

@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/sensu-community/sensu-plugin-sdk/sensu"
 	corev2 "github.com/sensu/sensu-go/api/core/v2"
+	"github.com/sensu/sensu-go/types"
 	k8scorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -24,21 +27,45 @@ import (
 // Config represents the check plugin config.
 type Config struct {
 	sensu.PluginConfig
-	External       bool
-	Namespace      string
-	Kubeconfig     string
-	ObjectKind     string
-	EventType      string
-	Interval       uint32
-	Handlers       []string
-	LabelSelectors string
-	StatusMap      string
-	AgentAPIURL    string
+	External             bool
+	LocalTest            bool
+	Namespace            string
+	Kubeconfig           string
+	ObjectKind           string
+	EventType            string
+	Interval             uint32
+	Handlers             []string
+	LabelSelectors       string
+	StatusMap            string
+	AgentAPIURL          string
+	AddClusterAnnotation string
+	SensuNamespace       string
+	SensuProxyEntity     string
+	SensuAutoClose       bool
+	APIBackendPass       string
+	APIBackendUser       string
+	APIBackendKey        string
+	APIBackendHost       string
+	APIBackendPort       int
+	Secure               bool
+	TrustedCAFile        string
+	InsecureSkipVerify   bool
+	GrafanaURL           string
+	Protocol             string
+}
+
+// Auth represents the authentication info
+type Auth struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresAt    int64  `json:"expires_at"`
 }
 
 type eventStatusMap map[string]uint32
 
 var (
+	tlsConfig tls.Config
+
 	plugin = Config{
 		PluginConfig: sensu.PluginConfig{
 			Name:     "sensu-kubernetes-events",
@@ -120,6 +147,114 @@ var (
 			Usage:     "The URL for the Agent API used to send events",
 			Value:     &plugin.AgentAPIURL,
 		},
+		{
+			Path:      "add-cluster-annotation",
+			Env:       "ADD_CLUSTER_ANNOTATION",
+			Argument:  "add-cluster-annotation",
+			Shorthand: "C",
+			Default:   "",
+			Usage:     "Cluster Annotation to be add to event to make it easier to identify, e. k8s-dev-cluster",
+			Value:     &plugin.AddClusterAnnotation,
+		},
+		{
+			Path:      "sensu-namespace",
+			Env:       "SENSU_NAMESPACE",
+			Argument:  "sensu-namespace",
+			Shorthand: "N",
+			Default:   "",
+			Usage:     "Sensu Namespace configuration, e. development",
+			Value:     &plugin.SensuNamespace,
+		},
+		{
+			Path:      "sensu-proxy-entity",
+			Env:       "SENSU_PROXY_ENTITY",
+			Argument:  "sensu-proxy-entity",
+			Shorthand: "E",
+			Default:   "",
+			Usage:     "Sensu Proxy Entity to overwrite event.check.proxy_entity_name",
+			Value:     &plugin.SensuProxyEntity,
+		},
+		{
+			Path:      "auto-close-sensu",
+			Env:       "AUTO_CLOSE_SENSU",
+			Argument:  "auto-close-sensu",
+			Shorthand: "A",
+			Default:   false,
+			Usage:     "Configure it to Auto Close if event doesn't match any Alerts from Alert Manager. Please configure others api-backend-* options before enable this flag",
+			Value:     &plugin.SensuAutoClose,
+		},
+		{
+			Path:      "api-backend-user",
+			Env:       "SENSU_API_USER",
+			Argument:  "api-backend-user",
+			Shorthand: "u",
+			Default:   "admin",
+			Usage:     "Sensu Go Backend API User",
+			Value:     &plugin.APIBackendUser,
+		},
+		{
+			Path:      "api-backend-pass",
+			Env:       "SENSU_API_PASSWORD",
+			Argument:  "api-backend-pass",
+			Shorthand: "P",
+			Default:   "P@ssw0rd!",
+			Usage:     "Sensu Go Backend API Password",
+			Value:     &plugin.APIBackendPass,
+		},
+		{
+			Path:      "api-backend-key",
+			Env:       "SENSU_API_KEY",
+			Argument:  "api-backend-key",
+			Shorthand: "K",
+			Default:   "",
+			Usage:     "Sensu Go Backend API Key",
+			Value:     &plugin.APIBackendKey,
+		},
+		{
+			Path:      "api-backend-host",
+			Env:       "",
+			Argument:  "api-backend-host",
+			Shorthand: "B",
+			Default:   "127.0.0.1",
+			Usage:     "Sensu Go Backend API Host (e.g. 'sensu-backend.example.com')",
+			Value:     &plugin.APIBackendHost,
+		},
+		{
+			Path:      "api-backend-port",
+			Env:       "",
+			Argument:  "api-backend-port",
+			Shorthand: "p",
+			Default:   8080,
+			Usage:     "Sensu Go Backend API Port (e.g. 4242)",
+			Value:     &plugin.APIBackendPort,
+		},
+		{
+			Path:      "secure",
+			Env:       "",
+			Argument:  "secure",
+			Shorthand: "S",
+			Default:   false,
+			Usage:     "Use TLS connection to API",
+			Value:     &plugin.Secure,
+		},
+		{
+			Path:      "insecure-skip-verify",
+			Env:       "",
+			Argument:  "insecure-skip-verify",
+			Shorthand: "i",
+			Default:   false,
+			Usage:     "skip TLS certificate verification (not recommended!)",
+			Value:     &plugin.InsecureSkipVerify,
+		},
+		{
+			Path:      "trusted-ca-file",
+			Env:       "",
+			Argument:  "trusted-ca-file",
+			Shorthand: "f",
+			Default:   "",
+			Usage:     "TLS CA certificate bundle in PEM format",
+			Value:     &plugin.TrustedCAFile,
+		},
 	}
 )
 
@@ -128,7 +263,7 @@ func main() {
 	check.Execute()
 }
 
-func checkArgs(event *corev2.Event) (int, error) {
+func checkArgs(event *types.Event) (int, error) {
 	if plugin.External {
 		if len(plugin.Kubeconfig) == 0 {
 			if home := homeDir(); home != "" {
@@ -145,12 +280,31 @@ func checkArgs(event *corev2.Event) (int, error) {
 	// Pick these up from the STDIN event
 	plugin.Interval = event.Check.Interval
 	plugin.Handlers = event.Check.Handlers
+	plugin.SensuNamespace = event.Check.ObjectMeta.Namespace
 
 	if len(plugin.Namespace) == 0 {
 		plugin.Namespace = event.Check.Namespace
 	} else if plugin.Namespace == "all" {
 		plugin.Namespace = ""
 	}
+
+	// For Sensu Backend Connections
+	if plugin.Secure {
+		plugin.Protocol = "https"
+	} else {
+		plugin.Protocol = "http"
+	}
+	if len(plugin.TrustedCAFile) > 0 {
+		caCertPool, err := corev2.LoadCACerts(plugin.TrustedCAFile)
+		if err != nil {
+			return sensu.CheckStateWarning, fmt.Errorf("Error loading specified CA file")
+		}
+		tlsConfig.RootCAs = caCertPool
+	}
+	tlsConfig.InsecureSkipVerify = plugin.InsecureSkipVerify
+
+	// tlsConfig.BuildNameToCertificate()
+	tlsConfig.CipherSuites = corev2.DefaultCipherSuites
 
 	if len(plugin.AgentAPIURL) == 0 {
 		return sensu.CheckStateCritical, fmt.Errorf("--agent-api-url or env var KUBERNETES_AGENT_API_URL required")
@@ -159,7 +313,7 @@ func checkArgs(event *corev2.Event) (int, error) {
 	return sensu.CheckStateOK, nil
 }
 
-func executeCheck(event *corev2.Event) (int, error) {
+func executeCheck(event *types.Event) (int, error) {
 
 	var config *rest.Config
 	var err error
@@ -229,6 +383,40 @@ func executeCheck(event *corev2.Event) (int, error) {
 		fmt.Println(out)
 	}
 
+	// Compare sensu events with alerts and resolved it
+	if plugin.SensuAutoClose {
+		fmt.Println("Starting auto close")
+		var autherr error
+		auth := Auth{}
+		if len(plugin.APIBackendKey) == 0 {
+			auth, autherr = authenticate()
+
+			if autherr != nil {
+				return sensu.CheckStateUnknown, autherr
+			}
+		}
+		sensuEvents, err := getEvents(auth, plugin.SensuNamespace)
+		if err != nil {
+			return sensu.CheckStateCritical, err
+		}
+		for _, e := range sensuEvents {
+			for k, v := range e.Labels {
+				if k == "io.kubernetes.event.id" {
+					if checkKubernetesEventID(events, v) {
+						fmt.Printf("Closing %s\n", e.Check.Name)
+						output := fmt.Sprintf("Resolved Automatically \n%s", e.Check.Output)
+						e.Check.Output = output
+						e.Check.Status = 0
+						err = submitEventAgentAPI(e)
+						if err != nil {
+							return sensu.CheckStateCritical, err
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return sensu.CheckStateOK, nil
 }
 
@@ -254,6 +442,10 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 	event.ObjectMeta.Labels = make(map[string]string)
 	event.ObjectMeta.Labels["io.kubernetes.event.id"] = k8sEvent.ObjectMeta.Name
 	event.ObjectMeta.Labels["io.kubernetes.event.namespace"] = k8sEvent.ObjectMeta.Namespace
+	event.ObjectMeta.Labels[plugin.Name] = "owner"
+	if plugin.AddClusterAnnotation != "" {
+		event.ObjectMeta.Labels["io.kubernetes.cluster"] = plugin.AddClusterAnnotation
+	}
 
 	// Sensu Event Name
 	switch lowerKind {
@@ -461,6 +653,18 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 		return &corev2.Event{}, err
 	}
 	event.Check.Status = status
+	// overwrite sensu namespace
+	if plugin.SensuNamespace != "" {
+		event.Check.ObjectMeta.Namespace = plugin.SensuNamespace
+	}
+
+	// overwrite proxy entity name
+	if plugin.SensuProxyEntity != "" {
+		// first make any check unique
+		event.Check.Name = fmt.Sprintf("%s-%s", event.Check.Name, event.Check.ProxyEntityName)
+		// then replace proxy entity
+		event.Check.ProxyEntityName = plugin.SensuProxyEntity
+	}
 
 	// Populate the remaining Sensu event details
 	event.Timestamp = k8sEvent.LastTimestamp.Time.Unix()
@@ -474,6 +678,7 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 		k8sEvent.Reason,
 		k8sEvent.Message,
 	)
+
 	return event, nil
 }
 
@@ -505,4 +710,129 @@ func getSensuEventStatus(eventType string) (uint32, error) {
 		return val, nil
 	}
 	return 255, nil
+}
+
+// authenticate funcion to wotk with api-backend-* flags
+func authenticate() (Auth, error) {
+	var auth Auth
+	client := http.DefaultClient
+	client.Transport = http.DefaultTransport
+
+	if plugin.Secure {
+		client.Transport.(*http.Transport).TLSClientConfig = &tlsConfig
+	}
+
+	req, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf("%s://%s:%d/auth", plugin.Protocol, plugin.APIBackendHost, plugin.APIBackendPort),
+		nil,
+	)
+	if err != nil {
+		return auth, fmt.Errorf("error generating auth request: %v", err)
+	}
+
+	req.SetBasicAuth(plugin.APIBackendUser, plugin.APIBackendPass)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return auth, fmt.Errorf("error executing auth request: %v", err)
+	}
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return auth, fmt.Errorf("error reading auth response: %v", err)
+	}
+
+	if strings.HasPrefix(string(body), "Unauthorized") {
+		return auth, fmt.Errorf("authorization failed for user %s", plugin.APIBackendUser)
+	}
+
+	err = json.NewDecoder(bytes.NewReader(body)).Decode(&auth)
+
+	if err != nil {
+		trim := 64
+		return auth, fmt.Errorf("error decoding auth response: %v\nFirst %d bytes of response: %s", err, trim, trimBody(body, trim))
+	}
+
+	return auth, err
+}
+
+// get events from sensu-backend-api
+func getEvents(auth Auth, namespace string) ([]*types.Event, error) {
+	client := http.DefaultClient
+	client.Transport = http.DefaultTransport
+
+	url := fmt.Sprintf("%s://%s:%d/api/core/v2/namespaces/%s/events", plugin.Protocol, plugin.APIBackendHost, plugin.APIBackendPort, namespace)
+	events := []*types.Event{}
+
+	if plugin.Secure {
+		client.Transport.(*http.Transport).TLSClientConfig = &tlsConfig
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return events, fmt.Errorf("error creating GET request for %s: %v", url, err)
+	}
+
+	if len(plugin.APIBackendKey) == 0 {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", auth.AccessToken))
+	} else {
+		req.Header.Set("Authorization", fmt.Sprintf("Key %s", plugin.APIBackendKey))
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return events, fmt.Errorf("error executing GET request for %s: %v", url, err)
+	}
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return events, fmt.Errorf("error reading response body during getEvents: %v", err)
+	}
+
+	err = json.Unmarshal(body, &events)
+	if err != nil {
+		trim := 64
+		return events, fmt.Errorf("error unmarshalling response during getEvents: %v\nFirst %d bytes of response: %s", err, trim, trimBody(body, trim))
+	}
+
+	// fmt.Printf("%#v", events)
+
+	result := filterEvents(events)
+
+	return result, err
+}
+
+// filter events from sensu-backend-api to look only events created by this plugin
+func filterEvents(events []*types.Event) (result []*types.Event) {
+
+	for _, event := range events {
+		if event.ObjectMeta.Labels[plugin.Name] == "owner" {
+			// fmt.Printf("Sensu event: %s\n Labels: %#v\n", event.Check.Name, &event.ObjectMeta.Labels)
+			result = append(result, event)
+		}
+
+	}
+	return result
+}
+
+// used to clean errors output
+func trimBody(body []byte, maxlen int) string {
+	if len(string(body)) < maxlen {
+		maxlen = len(string(body))
+	}
+
+	return string(body)[0:maxlen]
+}
+
+func checkKubernetesEventID(alerts *k8scorev1.EventList, f string) bool {
+	for _, a := range alerts.Items {
+		if a.ObjectMeta.Name == f && time.Since(a.FirstTimestamp.Time).Seconds() >= float64(plugin.Interval) {
+			return true
+		}
+	}
+	return false
 }

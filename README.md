@@ -54,15 +54,27 @@ Available Commands:
   version     Print the version number of this plugin
 
 Flags:
-  -a, --agent-api-url string     The URL for the Agent API used to send events (default "http://127.0.0.1:3031/events")
-  -t, --event-type string        Query for fieldSelector type (supports = and !=) (default "!=Normal")
-  -e, --external                 Connect to cluster externally (using kubeconfig)
-  -h, --help                     help for sensu-kubernetes-events
-  -c, --kubeconfig string        Path to the kubeconfig file (default $HOME/.kube/config)
-  -l, --label-selectors string   Query for labelSelectors (e.g. release=stable,environment=qa)
-  -n, --namespace string         Namespace to which to limit this check (defaults to check's namespace, use "all" for all namespaces)
-  -k, --object-kind string       Object kind to limit query to (Pod, Cluster, etc.)
-  -s, --status-map string        Map Kubernetes event type to Sensu event status (default "{\"normal\": 0, \"warning\": 1, \"default\": 3}")
+  -C, --add-cluster-annotation string   Cluster Annotation to be add to event to make it easier to identify, e. k8s-dev-cluster
+  -a, --agent-api-url string            The URL for the Agent API used to send events (default "http://127.0.0.1:3031/events")
+  -B, --api-backend-host string         Sensu Go Backend API Host (e.g. 'sensu-backend.example.com') (default "127.0.0.1")
+  -K, --api-backend-key string          Sensu Go Backend API Key
+  -P, --api-backend-pass string         Sensu Go Backend API Password (default "P@ssw0rd!")
+  -p, --api-backend-port int            Sensu Go Backend API Port (e.g. 4242) (default 8080)
+  -u, --api-backend-user string         Sensu Go Backend API User (default "admin")
+  -A, --auto-close-sensu                Configure it to Auto Close if event doesn't match any Alerts from Alert Manager. Please configure others api-backend-* options before enable this flag
+  -t, --event-type string               Query for fieldSelector type (supports = and !=) (default "!=Normal")
+  -e, --external                        Connect to cluster externally (using kubeconfig)
+  -h, --help                            help for sensu-kubernetes-events
+  -i, --insecure-skip-verify            skip TLS certificate verification (not recommended!)
+  -c, --kubeconfig string               Path to the kubeconfig file (default $HOME/.kube/config)
+  -l, --label-selectors string          Query for labelSelectors (e.g. release=stable,environment=qa)
+  -n, --namespace string                Namespace to which to limit this check
+  -k, --object-kind string              Object kind to limit query to (Pod, Cluster, etc.)
+  -S, --secure                          Use TLS connection to API
+  -N, --sensu-namespace string          Sensu Namespace configuration, e. development
+  -E, --sensu-proxy-entity string       Sensu Proxy Entity to overwrite event.check.proxy_entity_name
+  -s, --status-map string               Map Kubernetes event type to Sensu event status (default "{\"normal\": 0, \"warning\": 1, \"default\": 3}")
+  -f, --trusted-ca-file string          TLS CA certificate bundle in PEM format
 
 Use "sensu-kubernetes-events [command] --help" for more information about a command.
 
