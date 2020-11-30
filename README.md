@@ -1,6 +1,6 @@
-[![Sensu Bonsai Asset](https://img.shields.io/badge/Bonsai-Download%20Me-brightgreen.svg?colorB=89C967&logo=sensu)](https://bonsai.sensu.io/assets/sensu/sensu-kubernetes-events)
-![Go Test](https://github.com/sensu/sensu-kubernetes-events/workflows/Go%20Test/badge.svg)
-![goreleaser](https://github.com/sensu/sensu-kubernetes-events/workflows/goreleaser/badge.svg)
+[![Sensu Bonsai Asset](https://img.shields.io/badge/Bonsai-Download%20Me-brightgreen.svg?colorB=89C967&logo=sensu)](https://bonsai.sensu.io/assets/betorvs/sensu-kubernetes-events)
+![Go Test](https://github.com/betorvs/sensu-kubernetes-events/workflows/Go%20Test/badge.svg)
+![goreleaser](https://github.com/betorvs/sensu-kubernetes-events/workflows/goreleaser/badge.svg)
 
 # Sensu Kubernetes Events Check
 
@@ -134,7 +134,7 @@ using an asset, please consider doing so! If you're using sensuctl 5.13 with
 Sensu Backend 5.13 or later, you can use the following command to add the asset:
 
 ```
-sensuctl asset add sensu/sensu-kubernetes-events
+sensuctl asset add betorvs/sensu-kubernetes-events
 ```
 
 If you're using an earlier version of sensuctl, you can find the asset on the
@@ -157,7 +157,7 @@ spec:
   subscriptions:
   - system
   runtime_assets:
-  - sensu/sensu-kubernetes-events
+  - betorvs/sensu-kubernetes-events
   stdin: true
   handlers:
   - slack
