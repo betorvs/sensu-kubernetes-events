@@ -364,6 +364,8 @@ func executeCheck(event *types.Event) (int, error) {
 
 	output := []string{}
 
+	fmt.Printf("Number of kubernetes events found: %d \n", len(events.Items))
+
 	for _, item := range events.Items {
 		if time.Since(item.FirstTimestamp.Time).Seconds() <= float64(plugin.Interval) {
 			output = append(output, fmt.Sprintf("Event for %s %s in namespace %s, reason: %q, message: %q", item.InvolvedObject.Kind, item.ObjectMeta.Name, item.ObjectMeta.Namespace, item.Reason, item.Message))
@@ -385,7 +387,6 @@ func executeCheck(event *types.Event) (int, error) {
 
 	// Compare sensu events with alerts and resolved it
 	if plugin.SensuAutoClose {
-		fmt.Println("Starting auto close")
 		var autherr error
 		auth := Auth{}
 		if len(plugin.APIBackendKey) == 0 {
@@ -398,6 +399,9 @@ func executeCheck(event *types.Event) (int, error) {
 		sensuEvents, err := getEvents(auth, plugin.SensuNamespace)
 		if err != nil {
 			return sensu.CheckStateCritical, err
+		}
+		if len(sensuEvents) > 0 {
+			fmt.Println("Starting auto close")
 		}
 		for _, e := range sensuEvents {
 			for k, v := range e.Labels {
@@ -810,7 +814,7 @@ func getEvents(auth Auth, namespace string) ([]*types.Event, error) {
 func filterEvents(events []*types.Event) (result []*types.Event) {
 
 	for _, event := range events {
-		if event.ObjectMeta.Labels[plugin.Name] == "owner" {
+		if event.ObjectMeta.Labels[plugin.Name] == "owner" && event.Check.Status != 0 {
 			// fmt.Printf("Sensu event: %s\n Labels: %#v\n", event.Check.Name, &event.ObjectMeta.Labels)
 			result = append(result, event)
 		}
