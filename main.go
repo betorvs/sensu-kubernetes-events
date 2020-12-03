@@ -406,7 +406,7 @@ func executeCheck(event *types.Event) (int, error) {
 		for _, e := range sensuEvents {
 			for k, v := range e.Labels {
 				if k == "io.kubernetes.event.id" {
-					if checkKubernetesEventID(events, v) {
+					if !checkKubernetesEventID(events, v) {
 						fmt.Printf("Closing %s\n", e.Check.Name)
 						output := fmt.Sprintf("Resolved Automatically \n%s", e.Check.Output)
 						e.Check.Output = output
@@ -834,7 +834,7 @@ func trimBody(body []byte, maxlen int) string {
 
 func checkKubernetesEventID(alerts *k8scorev1.EventList, f string) bool {
 	for _, a := range alerts.Items {
-		if a.ObjectMeta.Name == f && time.Since(a.FirstTimestamp.Time).Seconds() >= float64(plugin.Interval) {
+		if a.ObjectMeta.Name == f {
 			return true
 		}
 	}
