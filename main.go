@@ -650,6 +650,9 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 			lowerKind,
 		)
 	}
+	// add replicaset, pod, deployment, endpoints, node label
+	labelName := fmt.Sprintf("io.kubernetes.%s", lowerReason)
+	event.ObjectMeta.Labels[labelName] = lowerReason
 
 	// Event status mapping
 	status, err := getSensuEventStatus(k8sEvent.Type)
@@ -664,10 +667,13 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 
 	// overwrite proxy entity name
 	if plugin.SensuProxyEntity != "" {
+		// add check label
+		event.ObjectMeta.Labels["io.kubernetes.check"] = event.Check.Name
 		// first make any check unique
 		event.Check.Name = fmt.Sprintf("%s-%s", event.Check.Name, event.Check.ProxyEntityName)
 		// then replace proxy entity
 		event.Check.ProxyEntityName = plugin.SensuProxyEntity
+
 	}
 
 	// Populate the remaining Sensu event details
@@ -802,8 +808,6 @@ func getEvents(auth Auth, namespace string) ([]*types.Event, error) {
 		trim := 64
 		return events, fmt.Errorf("error unmarshalling response during getEvents: %v\nFirst %d bytes of response: %s", err, trim, trimBody(body, trim))
 	}
-
-	// fmt.Printf("%#v", events)
 
 	result := filterEvents(events)
 
