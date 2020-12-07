@@ -27,31 +27,32 @@ import (
 // Config represents the check plugin config.
 type Config struct {
 	sensu.PluginConfig
-	External             bool
-	LocalTest            bool
-	Namespace            string
-	Kubeconfig           string
-	ObjectKind           string
-	EventType            string
-	Interval             uint32
-	Handlers             []string
-	LabelSelectors       string
-	StatusMap            string
-	AgentAPIURL          string
-	AddClusterAnnotation string
-	SensuNamespace       string
-	SensuProxyEntity     string
-	SensuAutoClose       bool
-	APIBackendPass       string
-	APIBackendUser       string
-	APIBackendKey        string
-	APIBackendHost       string
-	APIBackendPort       int
-	Secure               bool
-	TrustedCAFile        string
-	InsecureSkipVerify   bool
-	GrafanaURL           string
-	Protocol             string
+	External                  bool
+	LocalTest                 bool
+	Namespace                 string
+	Kubeconfig                string
+	ObjectKind                string
+	EventType                 string
+	Interval                  uint32
+	Handlers                  []string
+	LabelSelectors            string
+	StatusMap                 string
+	AgentAPIURL               string
+	AddClusterAnnotation      string
+	SensuNamespace            string
+	SensuProxyEntity          string
+	SensuAutoClose            bool
+	APIBackendPass            string
+	APIBackendUser            string
+	APIBackendKey             string
+	APIBackendHost            string
+	APIBackendPort            int
+	Secure                    bool
+	TrustedCAFile             string
+	InsecureSkipVerify        bool
+	GrafanaMutatorIntegration bool
+	GrafanaURL                string
+	Protocol                  string
 }
 
 // Auth represents the authentication info
@@ -255,6 +256,15 @@ var (
 			Usage:     "TLS CA certificate bundle in PEM format",
 			Value:     &plugin.TrustedCAFile,
 		},
+		{
+			Path:      "grafana-mutator-integration",
+			Env:       "",
+			Argument:  "grafana-mutator-integration",
+			Shorthand: "",
+			Default:   false,
+			Usage:     "Add extra check labels into sensu event for sensu-grafana-mutator integration",
+			Value:     &plugin.GrafanaMutatorIntegration,
+		},
 	}
 )
 
@@ -450,6 +460,10 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 	if plugin.AddClusterAnnotation != "" {
 		event.ObjectMeta.Labels["io.kubernetes.cluster"] = plugin.AddClusterAnnotation
 	}
+	if plugin.GrafanaMutatorIntegration {
+		event.Check.ObjectMeta.Labels = make(map[string]string)
+		event.Check.ObjectMeta.Labels["namespace"] = k8sEvent.ObjectMeta.Namespace
+	}
 
 	// Sensu Event Name
 	switch lowerKind {
@@ -639,6 +653,13 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 		// Use Kubernetes event resource names for the Sensu Entity name (i.e.
 		// no special handling required).
 		event.Check.ProxyEntityName = lowerName
+		if plugin.GrafanaMutatorIntegration {
+			event.Check.ObjectMeta.Labels[lowerKind] = lowerName
+			if plugin.AddClusterAnnotation != "" {
+				event.Check.ObjectMeta.Labels["cluster"] = plugin.AddClusterAnnotation
+			}
+		}
+
 	default:
 		// This is a valid event that we don't have special handling for. If you
 		// see an event associated with a Sensu entity that is suffixed with the

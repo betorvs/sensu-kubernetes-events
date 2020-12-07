@@ -64,6 +64,7 @@ Flags:
   -A, --auto-close-sensu                Configure it to Auto Close if event doesn't match any Alerts from Alert Manager. Please configure others api-backend-* options before enable this flag
   -t, --event-type string               Query for fieldSelector type (supports = and !=) (default "!=Normal")
   -e, --external                        Connect to cluster externally (using kubeconfig)
+      --grafana-mutator-integration     Add extra check labels into sensu event for sensu-grafana-mutator integration
   -h, --help                            help for sensu-kubernetes-events
   -i, --insecure-skip-verify            skip TLS certificate verification (not recommended!)
   -c, --kubeconfig string               Path to the kubeconfig file (default $HOME/.kube/config)
@@ -181,6 +182,8 @@ go build
 
 ## Additional notes
 
+New flag `--grafana-mutator-integration` add labels in event.check to be used by [sensu-grafana-mutator][13]
+
 ## Contributing
 
 For more information about contributing to this plugin, see [Contributing][1].
@@ -188,7 +191,7 @@ For more information about contributing to this plugin, see [Contributing][1].
 [1]: https://github.com/sensu/sensu-go/blob/master/CONTRIBUTING.md
 [2]: https://docs.sensu.io/sensu-go/latest/reference/checks/
 [3]: https://docs.sensu.io/sensu-go/latest/reference/assets/
-[4]: https://bonsai.sensu.io/assets/sensu/sensu-kubernetes-events
+[4]: https://bonsai.sensu.io/assets/betorvs/sensu-kubernetes-events
 [5]: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#event-v1-core
 [6]: https://docs.sensu.io/sensu-go/latest/reference/agent/#create-monitoring-events-using-the-agent-api
 [7]: https://docs.sensu.io/sensu-go/latest/reference/checks/#check-result-specification
@@ -197,3 +200,4 @@ For more information about contributing to this plugin, see [Contributing][1].
 [10]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 [11]: https://discourse.sensu.io/g/sig_kubernetes
 [12]: https://discourse.sensu.io/
+[13]: https://github.com/betorvs/sensu-grafana-mutator
