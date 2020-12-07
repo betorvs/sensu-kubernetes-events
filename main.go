@@ -460,10 +460,6 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 	if plugin.AddClusterAnnotation != "" {
 		event.ObjectMeta.Labels["io.kubernetes.cluster"] = plugin.AddClusterAnnotation
 	}
-	if plugin.GrafanaMutatorIntegration {
-		event.Check.ObjectMeta.Labels = make(map[string]string)
-		event.Check.ObjectMeta.Labels["namespace"] = k8sEvent.ObjectMeta.Namespace
-	}
 
 	// Sensu Event Name
 	switch lowerKind {
@@ -654,9 +650,13 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 		// no special handling required).
 		event.Check.ProxyEntityName = lowerName
 		if plugin.GrafanaMutatorIntegration {
+			event.Check.ObjectMeta.Labels = make(map[string]string)
 			event.Check.ObjectMeta.Labels[lowerKind] = lowerName
 			if plugin.AddClusterAnnotation != "" {
 				event.Check.ObjectMeta.Labels["cluster"] = plugin.AddClusterAnnotation
+			}
+			if lowerKind != "node" {
+				event.Check.ObjectMeta.Labels["namespace"] = k8sEvent.ObjectMeta.Namespace
 			}
 		}
 
