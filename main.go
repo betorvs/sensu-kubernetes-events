@@ -42,6 +42,7 @@ type Config struct {
 	SensuNamespace            string
 	SensuProxyEntity          string
 	SensuAutoClose            bool
+	SensuAutoCloseLabel       string
 	APIBackendPass            string
 	APIBackendUser            string
 	APIBackendKey             string
@@ -51,7 +52,6 @@ type Config struct {
 	TrustedCAFile             string
 	InsecureSkipVerify        bool
 	GrafanaMutatorIntegration bool
-	GrafanaURL                string
 	Protocol                  string
 }
 
@@ -183,6 +183,15 @@ var (
 			Default:   false,
 			Usage:     "Configure it to Auto Close if event doesn't match any Alerts from Alert Manager. Please configure others api-backend-* options before enable this flag",
 			Value:     &plugin.SensuAutoClose,
+		},
+		{
+			Path:      "auto-close-sensu-label",
+			Env:       "AUTO_CLOSE_SENSU_LABEL",
+			Argument:  "auto-close-sensu-label",
+			Shorthand: "",
+			Default:   "",
+			Usage:     "Configure it to Auto Close if event doesn't match any Alerts from Alert Manager and with these label. e. {\"cluster\":\"k8s-dev\"}",
+			Value:     &plugin.SensuAutoCloseLabel,
 		},
 		{
 			Path:      "api-backend-user",
@@ -410,9 +419,7 @@ func executeCheck(event *types.Event) (int, error) {
 		if err != nil {
 			return sensu.CheckStateCritical, err
 		}
-		if len(sensuEvents) > 0 {
-			fmt.Println("Starting auto close")
-		}
+		fmt.Printf("Number of Sensu Events found: %d\n", len(sensuEvents))
 		for _, e := range sensuEvents {
 			for k, v := range e.Labels {
 				if k == "io.kubernetes.event.id" {
@@ -837,10 +844,19 @@ func getEvents(auth Auth, namespace string) ([]*types.Event, error) {
 
 // filter events from sensu-backend-api to look only events created by this plugin
 func filterEvents(events []*types.Event) (result []*types.Event) {
-
+	excludeLabels := make(map[string]string)
+	if plugin.SensuAutoCloseLabel != "" {
+		err := json.Unmarshal([]byte(plugin.SensuAutoCloseLabel), &excludeLabels)
+		if err != nil {
+			fmt.Println("fail in SensuAutoCloseLabel Unmarshal")
+			return result
+		}
+	}
 	for _, event := range events {
-		if event.ObjectMeta.Labels[plugin.Name] == "owner" && event.Check.Status != 0 {
-			// fmt.Printf("Sensu event: %s\n Labels: %#v\n", event.Check.Name, &event.ObjectMeta.Labels)
+		if event.Check.ObjectMeta.Labels[plugin.Name] == "owner" && event.Check.Status != 0 {
+			if excludeLabels != nil && !searchLabels(event, excludeLabels) {
+				break
+			}
 			result = append(result, event)
 		}
 
@@ -863,5 +879,40 @@ func checkKubernetesEventID(alerts *k8scorev1.EventList, f string) bool {
 			return true
 		}
 	}
+	return false
+}
+
+func searchLabels(event *types.Event, labels map[string]string) bool {
+	if len(labels) == 0 {
+		return false
+	}
+	count := 0
+	for key, value := range labels {
+		if event.Labels != nil {
+			for k, v := range event.Labels {
+				if k == key && v == value {
+					count++
+				}
+			}
+		}
+		if event.Entity.Labels != nil {
+			for k, v := range event.Entity.Labels {
+				if k == key && v == value {
+					count++
+				}
+			}
+		}
+		if event.Check.Labels != nil {
+			for k, v := range event.Check.Labels {
+				if k == key && v == value {
+					count++
+				}
+			}
+		}
+		if count == len(labels) {
+			return true
+		}
+	}
+
 	return false
 }

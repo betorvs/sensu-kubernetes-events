@@ -43,6 +43,7 @@ to connect to the agent API on `http://127.0.0.1:3031/events`.
 
 ## Usage examples
 ```
+
 Sensu Kubernetes events check
 
 Usage:
@@ -62,6 +63,7 @@ Flags:
   -p, --api-backend-port int            Sensu Go Backend API Port (e.g. 4242) (default 8080)
   -u, --api-backend-user string         Sensu Go Backend API User (default "admin")
   -A, --auto-close-sensu                Configure it to Auto Close if event doesn't match any Alerts from Alert Manager. Please configure others api-backend-* options before enable this flag
+      --auto-close-sensu-label string   Configure it to Auto Close if event doesn't match any Alerts from Alert Manager and with these label. e. {"cluster":"k8s-dev"}
   -t, --event-type string               Query for fieldSelector type (supports = and !=) (default "!=Normal")
   -e, --external                        Connect to cluster externally (using kubeconfig)
       --grafana-mutator-integration     Add extra check labels into sensu event for sensu-grafana-mutator integration
@@ -78,6 +80,7 @@ Flags:
   -f, --trusted-ca-file string          TLS CA certificate bundle in PEM format
 
 Use "sensu-kubernetes-events [command] --help" for more information about a command.
+
 
 ```
 #### Namespaces
@@ -183,6 +186,7 @@ go build
 ## Additional notes
 
 New flag `--grafana-mutator-integration` add labels in event.check to be used by [sensu-grafana-mutator][13]
+If you run it with `--auto-close-sensu` more than once per Sensu Namespace, please consider configuring `--auto-close-sensu-label "{\"io.kubernetes.cluster\":\"k8s.dev\"}"` to avoid auto close from another cluster. 
 
 ## Contributing
 
