@@ -854,7 +854,7 @@ func filterEvents(events []*types.Event) (result []*types.Event) {
 	}
 	for _, event := range events {
 		if event.Check.ObjectMeta.Labels[plugin.Name] == "owner" && event.Check.Status != 0 {
-			if excludeLabels != nil && !searchLabels(event, excludeLabels) {
+			if plugin.SensuAutoCloseLabel != "" && !searchLabels(event, excludeLabels) {
 				break
 			}
 			result = append(result, event)
