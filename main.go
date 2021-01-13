@@ -181,7 +181,7 @@ var (
 			Argument:  "auto-close-sensu",
 			Shorthand: "A",
 			Default:   false,
-			Usage:     "Configure it to Auto Close if event doesn't match any Alerts from Alert Manager. Please configure others api-backend-* options before enable this flag",
+			Usage:     "Configure it to Auto Close if event doesn't match any Alerts from Kubernetes Events. Please configure others api-backend-* options before enable this flag",
 			Value:     &plugin.SensuAutoClose,
 		},
 		{
@@ -190,7 +190,7 @@ var (
 			Argument:  "auto-close-sensu-label",
 			Shorthand: "",
 			Default:   "",
-			Usage:     "Configure it to Auto Close if event doesn't match any Alerts from Alert Manager and with these label. e. {\"cluster\":\"k8s-dev\"}",
+			Usage:     "Configure it to Auto Close if event doesn't match any Alerts from Kubernetes Events and with these label. e. {\"cluster\":\"k8s-dev\"}",
 			Value:     &plugin.SensuAutoCloseLabel,
 		},
 		{
@@ -836,30 +836,27 @@ func getEvents(auth Auth, namespace string) ([]*types.Event, error) {
 		trim := 64
 		return events, fmt.Errorf("error unmarshalling response during getEvents: %v\nFirst %d bytes of response: %s", err, trim, trimBody(body, trim))
 	}
-
 	result := filterEvents(events)
-
 	return result, err
 }
 
 // filter events from sensu-backend-api to look only events created by this plugin
 func filterEvents(events []*types.Event) (result []*types.Event) {
-	excludeLabels := make(map[string]string)
+	matchLabels := make(map[string]string)
 	if plugin.SensuAutoCloseLabel != "" {
-		err := json.Unmarshal([]byte(plugin.SensuAutoCloseLabel), &excludeLabels)
+		err := json.Unmarshal([]byte(plugin.SensuAutoCloseLabel), &matchLabels)
 		if err != nil {
 			fmt.Println("fail in SensuAutoCloseLabel Unmarshal")
 			return result
 		}
 	}
 	for _, event := range events {
-		if event.Check.ObjectMeta.Labels[plugin.Name] == "owner" && event.Check.Status != 0 {
-			if plugin.SensuAutoCloseLabel != "" && !searchLabels(event, excludeLabels) {
-				break
+		if event.ObjectMeta.Labels[plugin.Name] == "owner" && event.Check.Status != 0 {
+			// if AutoCloseLabel is not empty and label match
+			if plugin.SensuAutoCloseLabel != "" && searchLabels(event, matchLabels) {
+				result = append(result, event)
 			}
-			result = append(result, event)
 		}
-
 	}
 	return result
 }
