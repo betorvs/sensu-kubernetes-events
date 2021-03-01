@@ -62,8 +62,8 @@ Flags:
   -P, --api-backend-pass string         Sensu Go Backend API Password (default "P@ssw0rd!")
   -p, --api-backend-port int            Sensu Go Backend API Port (e.g. 4242) (default 8080)
   -u, --api-backend-user string         Sensu Go Backend API User (default "admin")
-  -A, --auto-close-sensu                Configure it to Auto Close if event doesn't match any Alerts from Alert Manager. Please configure others api-backend-* options before enable this flag
-      --auto-close-sensu-label string   Configure it to Auto Close if event doesn't match any Alerts from Alert Manager and with these label. e. {"cluster":"k8s-dev"}
+  -A, --auto-close-sensu                Configure it to Auto Close if event doesn't match any Alerts from Kubernetes Events. Please configure others api-backend-* options before enable this flag
+      --auto-close-sensu-label string   Configure it to Auto Close if event doesn't match any Alerts from Kubernetes Events and with these label. e. {"cluster":"k8s-dev"}
   -t, --event-type string               Query for fieldSelector type (supports = and !=) (default "!=Normal")
   -e, --external                        Connect to cluster externally (using kubeconfig)
       --grafana-mutator-integration     Add extra check labels into sensu event for sensu-grafana-mutator integration
@@ -74,6 +74,8 @@ Flags:
   -n, --namespace string                Namespace to which to limit this check
   -k, --object-kind string              Object kind to limit query to (Pod, Cluster, etc.)
   -S, --secure                          Use TLS connection to API
+      --sensu-extra-annotation string   Add Extra Sensu Check Annotation in alert send to Sensu Agent API. Format: annotationName=annotationValue Or for multiples use comma: annotationName=annotationValue,extraTwo=extraValue
+      --sensu-extra-label string        Add Extra Sensu Check Label in alert send to Sensu Agent API. Format: labelName=labelValue Or for multiple values labelName=labelValue,ExtraLabel=ExtraValue
   -N, --sensu-namespace string          Sensu Namespace configuration, e. development
   -E, --sensu-proxy-entity string       Sensu Proxy Entity to overwrite event.check.proxy_entity_name
   -s, --status-map string               Map Kubernetes event type to Sensu event status (default "{\"normal\": 0, \"warning\": 1, \"default\": 3}")

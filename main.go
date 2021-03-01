@@ -41,6 +41,8 @@ type Config struct {
 	AddClusterAnnotation      string
 	SensuNamespace            string
 	SensuProxyEntity          string
+	SensuExtraLabel           string
+	SensuExtraAnnotation      string
 	SensuAutoClose            bool
 	SensuAutoCloseLabel       string
 	APIBackendPass            string
@@ -174,6 +176,24 @@ var (
 			Default:   "",
 			Usage:     "Sensu Proxy Entity to overwrite event.check.proxy_entity_name",
 			Value:     &plugin.SensuProxyEntity,
+		},
+		{
+			Path:      "sensu-extra-label",
+			Env:       "SENSU_EXTRA_LABEL",
+			Argument:  "sensu-extra-label",
+			Shorthand: "",
+			Default:   "",
+			Usage:     "Add Extra Sensu Check Label in alert send to Sensu Agent API. Format: labelName=labelValue Or for multiple values labelName=labelValue,ExtraLabel=ExtraValue",
+			Value:     &plugin.SensuExtraLabel,
+		},
+		{
+			Path:      "sensu-extra-annotation",
+			Env:       "SENSU_EXTRA_ANNOTATION",
+			Argument:  "sensu-extra-annotation",
+			Shorthand: "",
+			Default:   "",
+			Usage:     "Add Extra Sensu Check Annotation in alert send to Sensu Agent API. Format: annotationName=annotationValue Or for multiples use comma: annotationName=annotationValue,extraTwo=extraValue",
+			Value:     &plugin.SensuExtraAnnotation,
 		},
 		{
 			Path:      "auto-close-sensu",
@@ -717,6 +737,17 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 		k8sEvent.Message,
 	)
 
+	if plugin.SensuExtraLabel != "" {
+		extraLabels := parseLabelArg(plugin.SensuExtraLabel)
+		// log.Println(extraLabels)
+		event.Check.Labels = mergeStringMaps(event.Check.Labels, extraLabels)
+	}
+	if plugin.SensuExtraAnnotation != "" {
+		extraAnnotations := parseLabelArg(plugin.SensuExtraAnnotation)
+		// log.Println(extraAnnotations)
+		event.Check.Annotations = mergeStringMaps(event.Check.Annotations, extraAnnotations)
+	}
+
 	return event, nil
 }
 
@@ -912,4 +943,30 @@ func searchLabels(event *types.Event, labels map[string]string) bool {
 	}
 
 	return false
+}
+
+// parse selector labels to filter then in Alert Manager alerts endpoint
+func parseLabelArg(labelArg string) map[string]string {
+	labels := map[string]string{}
+
+	pairs := strings.Split(labelArg, ",")
+
+	for _, pair := range pairs {
+		parts := strings.Split(pair, "=")
+		if len(parts) == 2 {
+			labels[parts[0]] = parts[1]
+		}
+	}
+
+	return labels
+}
+
+func mergeStringMaps(left, right map[string]string) map[string]string {
+	for k, v := range right {
+		// fmt.Println(left[k])
+		if left[k] == "" {
+			left[k] = v
+		}
+	}
+	return left
 }
