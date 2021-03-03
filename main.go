@@ -752,12 +752,22 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 	if plugin.SensuExtraLabel != "" {
 		extraLabels := parseLabelArg(plugin.SensuExtraLabel)
 		// log.Println(extraLabels)
-		event.Check.Labels = mergeStringMaps(event.Check.Labels, extraLabels)
+		if event.Check.Labels != nil {
+			event.Check.Labels = mergeStringMaps(event.Check.Labels, extraLabels)
+		} else {
+			event.Check.Labels = extraLabels
+		}
+
 	}
 	if plugin.SensuExtraAnnotation != "" {
 		extraAnnotations := parseLabelArg(plugin.SensuExtraAnnotation)
 		// log.Println(extraAnnotations)
-		event.Check.Annotations = mergeStringMaps(event.Check.Annotations, extraAnnotations)
+		if event.Check.Annotations != nil {
+			event.Check.Annotations = mergeStringMaps(event.Check.Annotations, extraAnnotations)
+		} else {
+			event.Check.Annotations = extraAnnotations
+		}
+
 	}
 
 	return event, nil
