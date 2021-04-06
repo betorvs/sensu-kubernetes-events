@@ -65,6 +65,7 @@ Flags:
   -A, --auto-close-sensu                Configure it to Auto Close if event doesn't match any Alerts from Kubernetes Events. Please configure others api-backend-* options before enable this flag
       --auto-close-sensu-label string   Configure it to Auto Close if event doesn't match any Alerts from Kubernetes Events and with these label. e. {"cluster":"k8s-dev"}
   -t, --event-type string               Query for fieldSelector type (supports = and !=) (default "!=Normal")
+      --exclude-by-reason string        Exclude events based on Reason. E. OperationCompleted,BackOff
   -e, --external                        Connect to cluster externally (using kubeconfig)
       --grafana-mutator-integration     Add extra check labels into sensu event for sensu-grafana-mutator integration
   -h, --help                            help for sensu-kubernetes-events

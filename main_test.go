@@ -343,3 +343,29 @@ func TestMergeStringMaps(t *testing.T) {
 	res4 := mergeStringMaps(left4, right4)
 	assert.Equal(t, val4, res4)
 }
+
+func TestStringInSlice(t *testing.T) {
+	testSlice := []string{"foo", "bar", "test"}
+	testString := "test"
+	testResult := stringInSlice(testString, testSlice)
+	assert.True(t, testResult)
+}
+
+func TestStringToSliceStrings(t *testing.T) {
+	test1 := "test1"
+	expected1 := []string{"test1"}
+	res1 := stringToSliceStrings(test1)
+	assert.Equal(t, expected1, res1)
+	test2 := "test1,test2"
+	expected2 := []string{"test1", "test2"}
+	res2 := stringToSliceStrings(test2)
+	assert.Equal(t, expected2, res2)
+	test3 := "test1,"
+	expected3 := []string{"test1"}
+	res3 := stringToSliceStrings(test3)
+	assert.Equal(t, expected3, res3)
+	test4 := ""
+	expected4 := []string{}
+	res4 := stringToSliceStrings(test4)
+	assert.Equal(t, expected4, res4)
+}

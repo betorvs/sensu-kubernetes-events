@@ -32,6 +32,7 @@ type Config struct {
 	Namespace                 string
 	Kubeconfig                string
 	ObjectKind                string
+	ExcludeByReason           string
 	EventType                 string
 	Interval                  uint32
 	Handlers                  []string
@@ -113,6 +114,15 @@ var (
 			Default:   "",
 			Usage:     "Object kind to limit query to (Pod, Cluster, etc.)",
 			Value:     &plugin.ObjectKind,
+		},
+		{
+			Path:      "exclude-by-reason",
+			Env:       "KUBERNETES_EXCLUDE_BY_REASON",
+			Argument:  "exclude-by-reason",
+			Shorthand: "",
+			Default:   "",
+			Usage:     "Exclude events based on Reason. E. OperationCompleted,BackOff",
+			Value:     &plugin.ExcludeByReason,
 		},
 		{
 			Path:      "event-type",
@@ -414,10 +424,19 @@ func executeCheck(event *types.Event) (int, error) {
 	}
 
 	output := []string{}
+	excludeReasons := []string{}
+	excludeList := false
+	if plugin.ExcludeByReason != "" {
+		excludeReasons = stringToSliceStrings(plugin.ExcludeByReason)
+		excludeList = true
+	}
 
 	fmt.Printf("Number of kubernetes events found: %d \n", len(events.Items))
 
 	for _, item := range events.Items {
+		if excludeList && stringInSlice(item.Reason, excludeReasons) {
+			continue
+		}
 		if time.Since(item.FirstTimestamp.Time).Seconds() <= float64(plugin.Interval) {
 			output = append(output, fmt.Sprintf("Event for %s %s in namespace %s, reason: %q, message: %q", item.InvolvedObject.Kind, item.ObjectMeta.Name, item.ObjectMeta.Namespace, item.Reason, item.Message))
 			event, err := createSensuEvent(item)
@@ -490,10 +509,13 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 	lowerFieldPath := strings.ToLower(k8sEvent.InvolvedObject.FieldPath)
 	lowerReason := strings.ToLower(k8sEvent.Reason)
 	lowerMessage := strings.ToLower(k8sEvent.Message)
+	// default command
+	event.Check.Command = plugin.Name
 
 	// Default labels
 	event.ObjectMeta.Labels = make(map[string]string)
 	event.ObjectMeta.Labels["io.kubernetes.event.id"] = k8sEvent.ObjectMeta.Name
+	event.ObjectMeta.Labels["io.kubernetes.event.reason"] = k8sEvent.Reason
 	event.ObjectMeta.Labels["io.kubernetes.event.namespace"] = k8sEvent.ObjectMeta.Namespace
 	event.ObjectMeta.Labels[plugin.Name] = "owner"
 	if plugin.AddClusterAnnotation != "" {
@@ -711,8 +733,8 @@ func createSensuEvent(k8sEvent k8scorev1.Event) (*corev2.Event, error) {
 		)
 	}
 	// add replicaset, pod, deployment, endpoints, node label
-	labelName := fmt.Sprintf("io.kubernetes.%s", lowerReason)
-	event.ObjectMeta.Labels[labelName] = lowerReason
+	// labelName := fmt.Sprintf("io.kubernetes.%s", lowerReason)
+	// event.ObjectMeta.Labels[labelName] = lowerReason
 
 	// Event status mapping
 	status, err := getSensuEventStatus(k8sEvent.Type)
@@ -991,4 +1013,31 @@ func mergeStringMaps(left, right map[string]string) map[string]string {
 		}
 	}
 	return left
+}
+
+func stringToSliceStrings(s string) []string {
+	slice := []string{}
+	if s != "" {
+		if strings.Contains(s, ",") {
+			splited := strings.Split(s, ",")
+			for _, v := range splited {
+				if v != "" {
+					slice = append(slice, v)
+				}
+			}
+		} else {
+			slice = []string{s}
+		}
+	}
+	return slice
+}
+
+// use to parse annotations to send as link
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
